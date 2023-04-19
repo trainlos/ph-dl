@@ -1,0 +1,136 @@
+#!/bin/bash
+
+run_script() {
+  # Ask user if they want to update
+  read -p "Check for Debian package updates? [Y/n] " -n 1 update
+  echo ""
+  if [[ "$update" =~ ^[Yy]?$ ]]; then
+    echo "Checking for updates..."
+    sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y
+  else
+    echo "Skipped update check. Continuing..."
+  fi
+
+  # Ask user if they want to download or convert videos
+  echo ""
+  read -p "Do you want to download or convert videos? [D/c] " -n 1 download_or_convert
+  echo ""
+  if [[ "$download_or_convert" =~ ^[Dd]?$ ]]; then
+    download
+  elif [[ "$download_or_convert" =~ ^[Cc]?$ ]]; then
+    convert
+  else
+    echo "Invalid choice. Exiting..."
+    exit 1
+  fi
+}
+
+download() {
+  # Find text files in the current directory
+  shopt -s nullglob
+  txt_files=(*.txt)
+
+  # Exit if there are no text files
+  if (( ${#txt_files[@]} == 0 )); then
+    echo "No text files found in the current directory."
+    exit 1
+  fi
+
+  # Loop over the text files and ask the user which one to use
+  for txt_file in "${txt_files[@]}"; do
+    read -p "Use $txt_file? [Y/n] " -n 1 use_file
+    echo ""
+
+    # If the user wants to use the current text file, continue with the script
+    if [[ "$use_file" =~ ^[Yy]?$ ]]; then
+      echo "Using $txt_file..."
+      while read -r url; do
+        # Change download format if downloading a YouTube video
+        if [[ $url == *"youtube.com"* ]] || [[ $url == *"youtu.be"* ]] || [[ $url =~ ^[a-zA-Z0-9_-]{11}$ ]]; then
+            dl_format="-f '((bv[height>2160] / bv[width>3840]) + ba) / ((bv[vcodec!^=av01][height>1080] / bv[vcodec!^=av01][width>1920]) + ba[ext=webm]) / (bv[ext=mp4][vcodec!^=av01] + ba[ext=m4a]) / (bv + ba) / b'"
+        else
+            dl_format=""
+        fi
+
+        # Get extension and codec of the video
+        IFS=',' read -r -a output < <(eval "yt-dlp --print '%(ext)s,%(vcodec)s' $dl_format '$url'")
+
+        ext=${output[0]}
+        vcodec=${output[1]}
+
+        if [[ "$ext" == "mkv" ]] || [[ $vcodec == *"av01"* ]]; then
+          echo "Unsupported video detected. Moving to 'conv' folder..."
+          eval "yt-dlp $dl_format -o 'conv/%(title)s [%(id)s].%(ext)s' '$url'"
+        else
+            eval "yt-dlp $dl_format '$url'"
+        fi
+
+      done < "$txt_file"
+      exit 0
+    fi
+  done
+
+  # If none of the text files were used, exit with an error message
+  echo "No text files were used."
+  exit 1
+}
+
+convert() {
+  # Create 'conv' folder if it doesn't exist
+  mkdir -p "conv"
+
+  # Wait for user input before continuing
+  echo "Move any files you wish to convert into the 'conv' folder."
+  read -n 1 -r -p "Press any key when you're ready to begin conversion."
+  echo ""
+
+  # Check if 'conv' folder exists and contains videos
+  if [[ ! -d "conv" ]] || [[ -z "$(ls -A conv)" ]]; then
+    echo "Error: 'conv' folder does not exist. Please create the folder and add videos to it."
+    exit 1
+  fi
+
+  # Create 'cut-source' folder if it doesn't exist
+  mkdir -p "cut-source"
+
+  # Iterate through all files in 'conv' folder
+  for video_file in conv/*; do
+
+    # Get user input for start time
+    echo "Converting $video_file"
+    read -r -p "Enter start time for 1 minute segment (format: HOURS:MM:SS.MILLISECONDS): " start_time
+    echo ""
+
+    # Convert video to ProRes 422 and avoid trancoding audio if possible
+    ffmpeg -hide_banner \
+       -ss "$start_time" \
+       -i "$video_file" \
+       -c:v prores \
+       -profile:v 2 \
+       -c:a copy \
+       -t 62 \
+       -vf "scale='min(1920,iw)':min'(1080,ih)':force_original_aspect_ratio=decrease:flags=lanczos" \
+       -r 24000/1001 \
+       "$(basename "${video_file%.*}")-cut.mov" \
+       || \
+       ffmpeg -hide_banner \
+              -y \
+              -ss "$start_time" \
+              -i "$video_file" \
+              -c:v prores \
+              -profile:v 2 \
+              -c:a pcm_s16le \
+              -t 62 \
+              -vf "scale='min(1920,iw)':min'(1080,ih)':force_original_aspect_ratio=decrease:flags=lanczos" \
+              -r 24000/1001 \
+              "$(basename "${video_file%.*}")-cut.mov"
+    
+    # Move original file to 'cut-source' folder
+    mv "$video_file" cut-source
+  done
+
+  echo "Conversion complete."
+}
+
+# Call the run_script function to start the script
+run_script

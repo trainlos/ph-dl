@@ -1,3 +1,0 @@
-#!/bin/sh
-sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y
-yt-dlp -f '((bv[ext=webm][height>1080] / bv[ext=webm][width>1920]) + ba[ext=webm]) / (bv[ext=mp4][vcodec!^=av01] + ba[ext=m4a]) / (bv + ba) / b' -S 'hdr:sdr' -o '%(title)s' --batch-file='list.txt'
