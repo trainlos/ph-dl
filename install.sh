@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Switching to Debian Bookworm..."
+echo "Switching to Debian testing..."
 sudo cp sources.list /etc/apt/sources.list
 sudo apt update
 sudo apt full-upgrade -y
