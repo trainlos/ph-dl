@@ -47,7 +47,7 @@ download() {
       while read -r url; do
         # Change download format if downloading a YouTube video
         if [[ $url == *"youtube.com"* ]] || [[ $url == *"youtu.be"* ]] || [[ $url =~ ^[a-zA-Z0-9_-]{11}$ ]]; then
-            dl_format="-f '((bv[height>2160] / bv[width>3840]) + ba) / ((bv[vcodec!^=av01][height>1080] / bv[vcodec!^=av01][width>1920]) + ba[ext=webm]) / (bv[ext=mp4][vcodec!^=av01] + ba[ext=m4a]) / (bv + ba) / b'"
+            dl_format="-f '((bv[height>2160] / bv[width>3840]) + ba) / (bv[vcodec^=vp09] + ba[ext=webm]) / (bv[ext=mp4][vcodec!^=av01] + ba[ext=m4a]) / (bv + ba) / b'"
         else
             dl_format=""
         fi
@@ -61,8 +61,10 @@ download() {
         if [[ "$ext" == "mkv" ]] || [[ $vcodec == *"av01"* ]]; then
           echo "Unsupported video detected. Moving to 'conv' folder..."
           eval "yt-dlp $dl_format -o 'conv/%(title)s [%(id)s].%(ext)s' '$url'"
+        elif [[ "$ext" == "mp4" ]] && [[ $vcodec == *"vp09"* ]]; then
+          eval "yt-dlp $dl_format --remux-video webm '$url'"
         else
-            eval "yt-dlp $dl_format '$url'"
+          eval "yt-dlp $dl_format '$url'"
         fi
 
       done < "$txt_file"
