@@ -47,7 +47,7 @@ download() {
       while read -r url; do
         # Change download format if downloading a YouTube video
         if [[ $url == *"youtube.com"* ]] || [[ $url == *"youtu.be"* ]] || [[ $url =~ ^[a-zA-Z0-9_-]{11}$ ]]; then
-            dl_format="-f '((bv[height>2160] / bv[width>3840]) + ba) / ((bv[vcodec!^=av01][height>1080] / bv[vcodec!^=av01][width>1920] / 616) + ba[ext=webm]) / (bv[ext=mp4][vcodec!^=av01] + ba[ext=m4a]) / (bv + ba) / b' --extractor-arg \"youtube:player_client=default,web_music,tv\""
+            dl_format="-f '((bv[height>2160] / bv[width>3840]) + ba) / ((bv[vcodec!^=av01][height>1080] / bv[vcodec!^=av01][width>1920] / 616) + ba[ext=webm]) / (bv[ext=mp4][vcodec!^=av01][vcodec!^=vp] + ba[ext=m4a]) / (bv + ba) / b' --extractor-arg \"youtube:player_client=default,web_music,tv\""
         else
             dl_format=""
         fi
